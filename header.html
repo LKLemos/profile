@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil com Fundo Chuvoso em Vidro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #000000;
+            color: #f0f0f0;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            perspective: 1500px;
+        }
+
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            outline: none;
+            z-index: -1;
+        }
+
+        .profile-card {
+            position: relative;
+            width: 90%;
+            max-width: 400px;
+            padding: 40px 35px 35px 35px;
+            
+            background: rgba(15, 5, 25, 0.45);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(138, 43, 226, 0.25);
+
+            text-align: center;
+            transition: transform 0.1s linear, box-shadow 0.3s ease; 
+            transform-style: preserve-3d;
+        }
+
+        .profile-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .profile-title {
+            font-size: 1rem;
+            font-weight: 300;
+            color: #c0c0c0;
+            margin-bottom: 25px;
+        }
+
+        .skills-container h3 {
+            font-weight: 600;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 15px;
+        }
+
+        .skills-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .skill-tag {
+            background-color: rgba(138, 43, 226, 0.2);
+            padding: 12px 10px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 400;
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            transition: background-color 0.3s, box-shadow 0.3s;
+            cursor: pointer; /* Adicionado cursor para indicar que é clicável */
+        }
+        
+        .skill-tag:hover {
+            background-color: rgba(138, 43, 226, 0.4);
+            box-shadow: 0 0 15px rgba(138, 43, 226, 0.6);
+        }
+
+        .skill-tag:last-child:nth-child(odd) {
+            grid-column: span 2;
+        }
+        
+        /* Botão para a funcionalidade Gemini */
+        #generate-idea-btn {
+            margin-top: 30px;
+            padding: 12px 25px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(45deg, #8A2BE2, #4B0082);
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        #generate-idea-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+        }
+
+        /* Modal para exibir o conteúdo do Gemini */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background: rgba(25, 10, 40, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        #gemini-output h2 {
+            margin-bottom: 15px;
+            color: #c8a2c8;
+        }
+        
+        /* Animação de Loading */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #8A2BE2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="webgl-canvas"></canvas>
+
+    <div class="profile-card">
+        <h1 class="profile-name">Matheus</h1>
+        <p class="profile-title">Especialista em IA & Automação</p>
+
+        <div class="skills-container">
+            <h3>Habilidades Principais</h3>
+            <div class="skills-list">
+                <span class="skill-tag" data-skill="Agentes de IA">Agentes de IA</span>
+                <span class="skill-tag" data-skill="Automação de Processos">Automação de Processos</span>
+                <span class="skill-tag" data-skill="Machine Learning">Machine Learning</span>
+                <span class="skill-tag" data-skill="Desenvolvimento Full-Stack">Desenvolvimento Full-Stack</span>
+                <span class="skill-tag" data-skill="Three.js">Three.js</span>
+            </div>
+        </div>
+        
+        <button id="generate-idea-btn">✨ Gerar Ideia de Projeto</button>
+    </div>
+
+    <!-- Modal para o Gemini -->
+    <div class="modal-overlay" id="gemini-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <div id="gemini-output">
+                <!-- Conteúdo gerado pela IA aparecerá aqui -->
+            </div>
+        </div>
+    </div>
+
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://esm.sh/three@0.165.0"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- CÓDIGO THREE.JS EXISTENTE (SEM MUDANÇAS) ---
+        // --- 1. SETUP BÁSICO ---
+        const sizes = {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100);
+        camera.position.z = 5;
+        scene.add(camera);
+        const renderer = new THREE.WebGLRenderer({
+            canvas: document.querySelector('#webgl-canvas'),
+            antialias: true,
+            alpha: true
+        });
+        renderer.setSize(sizes.width, sizes.height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // --- 2. ILUMINAÇÃO ---
+        const ambientLight = new THREE.AmbientLight(0x9400D3, 2.0);
+        scene.add(ambientLight);
+        const purplePointLight = new THREE.PointLight(0xaa00ff, 10, 40);
+        purplePointLight.position.set(0, 5, 0);
+        scene.add(purplePointLight);
+        
+        // --- 3. FUNDO ---
+        const textureLoader = new THREE.TextureLoader();
+        const backgroundTexture = textureLoader.load(
+            'https://images.unsplash.com/photo-1599252438159-45c635235913?q=80&w=1887&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            (texture) => {
+                const aspect = texture.image.width / texture.image.height;
+                const planeHeight = 10;
+                const planeWidth = planeHeight * aspect;
+                backgroundPlane.scale.set(planeWidth, planeHeight, 1);
+            }
+        );
+        const backgroundMaterial = new THREE.MeshBasicMaterial({ map: backgroundTexture });
+        const backgroundPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), backgroundMaterial);
+        backgroundPlane.position.z = -10;
+        scene.add(backgroundPlane);
+
+        // --- 4. EFEITO DE CHUVA ---
+        const rainCount = 10000;
+        const positions = new Float32Array(rainCount * 3);
+        const velocities = new Float32Array(rainCount);
+        for (let i = 0; i < rainCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 1] = Math.random() * 20;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+            velocities[i] = 0.1 + Math.random() * 0.1;
+        }
+        const rainGeometry = new THREE.BufferGeometry();
+        rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const rainMaterial = new THREE.PointsMaterial({
+            color: 0xddddff,
+            size: 0.015,
+            transparent: true,
+            opacity: 0.6
+        });
+        const rain = new THREE.Points(rainGeometry, rainMaterial);
+        scene.add(rain);
+
+        // --- 5. INTERAÇÃO E LOOP DE ANIMAÇÃO ---
+        const mouse = new THREE.Vector2();
+        const targetCameraPos = new THREE.Vector3();
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / sizes.width) * 2 - 1;
+            mouse.y = -(event.clientY / sizes.height) * 2 + 1;
+        });
+        const clock = new THREE.Clock();
+
+        const tick = () => {
+            const elapsedTime = clock.getElapsedTime();
+            const rainPositions = rain.geometry.attributes.position.array;
+            for (let i = 0; i < rainCount; i++) {
+                rainPositions[i * 3 + 1] -= velocities[i];
+                if (rainPositions[i * 3 + 1] < -10) {
+                    rainPositions[i * 3 + 1] = 10;
+                }
+            }
+            rain.geometry.attributes.position.needsUpdate = true;
+            targetCameraPos.x = mouse.x * 0.5;
+            targetCameraPos.y = mouse.y * 0.5;
+            camera.position.x += (targetCameraPos.x - camera.position.x) * 0.05;
+            camera.position.y += (targetCameraPos.y - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+            purplePointLight.position.x = Math.sin(elapsedTime * 0.5) * 5;
+            purplePointLight.position.z = Math.cos(elapsedTime * 0.3) * 5 - 5;
+            renderer.render(scene, camera);
+            window.requestAnimationFrame(tick);
+        };
+        tick();
+
+        // --- 6. ANIMAÇÃO DINÂMICA DO CARD ---
+        const card = document.querySelector('.profile-card');
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = ((y - centerY) / centerY) * -10;
+            const rotateY = ((x - centerX) / centerX) * 10;
+            card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'rotateX(0) rotateY(0) scale(1)';
+        });
+
+        // --- 7. RESPONSIVIDADE ---
+        window.addEventListener('resize', () => {
+            sizes.width = window.innerWidth;
+            sizes.height = window.innerHeight;
+            camera.aspect = sizes.width / sizes.height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(sizes.width, sizes.height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        });
+
+        // --- CÓDIGO NOVO: FUNCIONALIDADES COM GEMINI API ---
+
+        const modal = document.getElementById('gemini-modal');
+        const modalOutput = document.getElementById('gemini-output');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const generateIdeaBtn = document.getElementById('generate-idea-btn');
+        const skillTags = document.querySelectorAll('.skill-tag');
+
+        const apiKey = ""; // A chave da API será injetada pelo ambiente
+
+        // Função para chamar a API do Gemini
+        async function callGemini(prompt) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    // Substitui quebras de linha por <br> para formatação HTML
+                    return result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>');
+                } else {
+                    return "Não foi possível obter uma resposta da IA. Tente novamente.";
+                }
+            } catch (error) {
+                console.error("Erro ao chamar a API do Gemini:", error);
+                return `Ocorreu um erro: ${error.message}. Verifique o console para mais detalhes.`;
+            }
+        }
+
+        // Função para mostrar o modal com conteúdo
+        function showModal(title, contentPromise) {
+            modal.classList.add('visible');
+            modalOutput.innerHTML = `<h2>${title}</h2><div class="loader"></div>`;
+            
+            contentPromise.then(content => {
+                modalOutput.innerHTML = `<h2>${title}</h2><p>${content}</p>`;
+            });
+        }
+
+        // Função para fechar o modal
+        function closeModal() {
+            modal.classList.remove('visible');
+        }
+
+        // Event listener para o botão de gerar ideia
+        generateIdeaBtn.addEventListener('click', () => {
+            const skills = Array.from(skillTags).map(tag => tag.dataset.skill).join(', ');
+            const prompt = `Como um especialista em IA e automação com as seguintes habilidades: ${skills}, gere uma ideia de projeto inovador e conciso. Descreva o problema, a solução proposta e as tecnologias chave a serem usadas.`;
+            showModal("Ideia de Projeto ✨", callGemini(prompt));
+        });
+
+        // Event listeners para as tags de habilidade
+        skillTags.forEach(tag => {
+            tag.addEventListener('click', () => {
+                const skill = tag.dataset.skill;
+                const prompt = `Explique de forma concisa (em 2-3 frases) o que é a habilidade "${skill}" no contexto de um especialista em tecnologia e IA, destacando sua aplicação prática.`;
+                showModal(`O que é ${skill}? ✨`, callGemini(prompt));
+            });
+        });
+
+        // Event listeners para fechar o modal
+        modalCloseBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+    </script>
+</body>
+</html>
