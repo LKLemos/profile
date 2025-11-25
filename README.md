@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matheus Zamperlini – Filmmaker</title>
+    <!-- Fonte Segoe UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Ícones Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* --- RESET & BASE --- */
+        :root {
+            --nks-red-primary: #E63946;
+            --nks-red-dark: #9B2226;
+            --nks-black-bg: #050101;
+            
+            --glass-bg: rgba(20, 5, 5, 0.4); 
+            --glass-border: rgba(230, 57, 70, 0.4);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+            
+            --text-main: #ffffff;
+            --text-glow: 0 0 8px rgba(230, 57, 70, 0.8);
+            --window-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--nks-black-bg);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-bottom: 60px;
+        }
+
+        /* Canvas 3D no fundo */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 50% 50%, #1a0505 0%, #000000 100%);
+        }
+
+        /* Loading Overlay para o modelo 3D */
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
+        .loader {
+            width: 50px; height: 50px;
+            border: 5px solid #333;
+            border-top: 5px solid var(--nks-red-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: #1a0505; }
+        ::-webkit-scrollbar-thumb { background: var(--nks-red-dark); border: 2px solid #1a0505; border-radius: 6px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--nks-red-primary); }
+
+        /* --- NKS GLASS CLASS --- */
+        .nks-window {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.4) 100%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            border-radius: var(--window-radius);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 0 20px rgba(230, 57, 70, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .nks-window::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -150%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: skewX(-25deg);
+            transition: left 0.6s ease-in-out;
+            pointer-events: none;
+        }
+
+        .nks-window:hover::before { left: 150%; }
+        .nks-window:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6), 0 0 20px rgba(230, 57, 70, 0.4);
+            border-color: var(--nks-red-primary);
+        }
+
+        /* --- LAYOUT ELEMENTS --- */
+        header {
+            position: sticky; top: 20px; z-index: 1000;
+            max-width: 1200px; margin: 0 auto 40px auto;
+        }
+
+        .title-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 15px; border-bottom: 1px solid rgba(230, 57, 70, 0.3);
+            background: rgba(0,0,0,0.2);
+        }
+
+        .window-title {
+            font-weight: 700; font-size: 1rem; color: #fff;
+            text-shadow: var(--text-glow); display: flex; align-items: center; gap: 8px;
+        }
+
+        .window-controls { display: flex; gap: 5px; }
+        .control-btn {
+            width: 28px; height: 20px; border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: linear-gradient(to bottom, #3a3a3a, #1a1a1a);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: #ddd;
+        }
+        .control-btn.close { background: linear-gradient(to bottom, #E63946, #9B2226); border-color: #7a1a1d; color: white; }
+        .control-btn:hover { filter: brightness(1.2); border-color: var(--nks-red-primary); }
+
+        .nav-menu { display: flex; justify-content: center; gap: 20px; padding: 10px; }
+        .nav-menu a {
+            color: #eee; text-decoration: none; font-weight: 600; padding: 5px 15px;
+            border-radius: 4px; transition: all 0.2s; text-transform: uppercase; font-size: 0.9rem;
+        }
+        .nav-menu a:hover { background: rgba(230, 57, 70, 0.3); color: #fff; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        .hero-section {
+            text-align: center; padding: 70px 40px; margin-bottom: 60px;
+            border: 1px solid rgba(230, 57, 70, 0.5);
+            background: rgba(20, 0, 0, 0.3) !important; 
+        }
+
+        .hero-title {
+            font-size: 4rem; font-weight: 700; color: #fff;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.8), var(--text-glow);
+            margin-bottom: 20px; text-transform: uppercase;
+        }
+        .hero-subtitle {
+            font-size: 1.3rem; color: #ffdada; margin-bottom: 40px; max-width: 600px;
+            margin-left: auto; margin-right: auto; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .btn-nks {
+            background: linear-gradient(180deg, #E63946 0%, #9B2226 100%);
+            border: 1px solid #5a0000; padding: 14px 40px; color: white;
+            font-size: 1.1rem; font-weight: 700; border-radius: 4px; cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: all 0.2s;
+            text-decoration: none; display: inline-block; text-transform: uppercase;
+        }
+        .btn-nks:hover {
+            background: linear-gradient(180deg, #ff5a67 0%, #C1121F 100%);
+            box-shadow: 0 0 25px rgba(230, 57, 70, 0.9); transform: translateY(-2px);
+        }
+
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-bottom: 80px; }
+        .feature-card { padding: 30px; color: #fff; border-color: rgba(230, 57, 70, 0.3); }
+        .feature-card h3 { color: var(--nks-red-primary); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+        .feature-card p { color: #ddd; line-height: 1.6; }
+
+        .explorer-window { margin-bottom: 80px; color: #fff; }
+        .address-bar {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(230, 57, 70, 0.3);
+            margin: 10px 15px; padding: 5px 10px; display: flex; align-items: center; gap: 10px;
+            font-size: 0.9rem; color: #ccc;
+        }
+        .explorer-content { padding: 30px; background: rgba(0,0,0,0.4); display: flex; gap: 30px; align-items: center; }
+        .explorer-icon {
+            width: 80px; height: 80px; background: linear-gradient(135deg, var(--nks-red-primary), var(--nks-red-dark));
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 20px rgba(230, 57, 70, 0.3); color: white; border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 80px; }
+        .mini-window { height: 150px; border-color: rgba(230, 57, 70, 0.3); }
+        .mini-header {
+            height: 25px; background: linear-gradient(to bottom, rgba(230, 57, 70, 0.3), rgba(155, 34, 38, 0.3));
+            border-bottom: 1px solid rgba(230, 57, 70, 0.3); display: flex; align-items: center;
+            padding-left: 10px; font-size: 0.7rem; color: #fff; font-weight: 600;
+        }
+        .mini-body { height: calc(100% - 25px); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+        .ui-bar { width: 60%; height: 8px; background: #555; border-radius: 4px; margin-bottom: 5px; border: 1px solid #333;}
+        .ui-btn { width: 30%; height: 20px; background: var(--nks-red-dark); border: 1px solid #333;}
+
+        /* Footer / Taskbar */
+        .taskbar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 48px;
+            background: linear-gradient(to bottom, rgba(20, 0, 0, 0.95), rgba(40, 0, 0, 0.98));
+            backdrop-filter: blur(10px); border-top: 1px solid rgba(230, 57, 70, 0.4);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 10px; z-index: 9999;
+        }
+        .start-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: radial-gradient(circle, var(--nks-red-primary) 0%, var(--nks-red-dark) 100%);
+            box-shadow: 0 0 10px rgba(230, 57, 70, 0.6); display: flex; align-items: center;
+            justify-content: center; cursor: pointer; border: 1px solid var(--nks-red-primary);
+        }
+        .start-btn:hover { box-shadow: 0 0 25px rgba(230, 57, 70, 1); filter: brightness(1.3); }
+        .start-logo { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 16px; height: 16px; transform: rotate(45deg); }
+        .win-sq { width: 100%; height: 100%; }
+        .win-sq:nth-child(1) { background: #ffffff; } 
+        .win-sq:nth-child(2) { background: #333333; } 
+        .win-sq:nth-child(3) { background: var(--nks-red-primary); } 
+        .win-sq:nth-child(4) { background: #000000; } 
+
+        .taskbar-apps { flex-grow: 1; display: flex; padding-left: 20px; gap: 5px; }
+        .task-item {
+            padding: 8px 15px; border-radius: 3px; color: #ddd; font-size: 0.9rem; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .task-item.active { background: rgba(230, 57, 70, 0.2); border: 1px solid rgba(230, 57, 70, 0.3); color: white; }
+        .tray-area {
+            background: rgba(0,0,0,0.4); padding: 5px 15px; border-radius: 4px;
+            border: 1px solid rgba(230, 57, 70, 0.2); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: #fff; font-size: 0.75rem; min-width: 80px;
+        }
+        .footer-credits {
+            position: absolute; bottom: 60px; width: 100%; text-align: center;
+            font-size: 0.8rem; color: rgba(255,255,255,0.5);
+        }
+
+        /* Animações */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; opacity: 0; }
+        .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.3s; } .delay-3 { animation-delay: 0.5s; }
+
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.5rem; }
+            .nav-menu { flex-wrap: wrap; }
+            .address-bar { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div style="color: #fff; font-weight: 600; letter-spacing: 1px;">CARREGANDO SISTEMA MZ...</div>
+    </div>
+
+    <!-- Canvas para a Raposa 3D -->
+    <canvas id="bg-canvas"></canvas>
+
+    <header class="nks-window animate-in">
+        <div class="title-bar">
+            <div class="window-title">
+                <i data-lucide="film" color="#E63946"></i> Matheus Zamperlini – Filmmaker
+            </div>
+            <div class="window-controls">
+                <div class="control-btn"><i data-lucide="minus" size="12"></i></div>
+                <div class="control-btn"><i data-lucide="square" size="10"></i></div>
+                <div class="control-btn close"><i data-lucide="x" size="12"></i></div>
+            </div>
+        </div>
+        <nav class="nav-menu">
+            <a href="#home">Home</a>
+            <a href="#about">Sobre Mim</a>
+            <a href="#services">Serviços</a>
+            <a href="#contact">Contato</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section id="home" class="hero-section nks-window animate-in delay-1">
+            <h1 class="hero-title">Matheus Zamperlini</h1>
+            <p class="hero-subtitle">
+                Filmmaker. Editor. Visual Storyteller.<br>
+                Transformando paixão em narrativas visuais impactantes.
+            </p>
+            <a href="#about" class="btn-nks">Ver Portfólio</a>
+        </section>
+
+        <section id="services" class="grid-3">
+            <div class="feature-card nks-window animate-in delay-2">
+                <h3><i data-lucide="clapperboard" color="#E63946"></i> Produção Visual</h3>
+                <p>Da concepção à execução. Apaixonado por câmeras e pela arte de capturar o ângulo perfeito que define a cena.</p>
+            </div>
+            <div class="feature-card nks-window animate-in delay-2">
+                <h3><i data-lucide="scissors" color="#E63946"></i> Edição de Vídeo</h3>
+                <p>Cortes precisos, ritmo envolvente e montagem dinâmica. Transformo material bruto em histórias que emocionam.</p>
+            </div>
+            <div class="feature-card nks-window animate-in delay-2">
+                <h3><i data-lucide="aperture" color="#E63946"></i> Cinematografia</h3>
+                <p>Controle total sobre luz, cor e composição para criar atmosferas visuais únicas e memoráveis.</p>
+            </div>
+        </section>
+
+        <section id="about" class="explorer-window nks-window animate-in delay-3">
+            <div class="title-bar">
+                <div class="window-title"><i data-lucide="user"></i> Perfil do Criador</div>
+            </div>
+            <div class="address-bar"><i data-lucide="hard-drive"></i> SYSTEM > USERS > MATHEUS_ZAMPERLINI > ABOUT_ME</div>
+            <div class="explorer-content">
+                <div class="explorer-icon"><i data-lucide="video" size="40"></i></div>
+                <div>
+                    <h2 style="margin-bottom: 10px; color: var(--nks-red-primary);">Sobre Mim</h2>
+                    <p style="color: #ddd; line-height: 1.6;">
+                        Olá, sou Matheus Zamperlini. Sou um filmmaker movido pela paixão de contar histórias através das lentes. Meu mundo gira em torno de câmeras, frames e timelines.
+                        <br><br>
+                        Especialista em captação e edição de vídeo, dedico minha vida a criar experiências visuais que não apenas são assistidas, mas sentidas. Seja em um projeto comercial ou artístico, meu objetivo é sempre elevar a narrativa visual ao seu potencial máximo.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="gallery">
+            <h2 style="color:white; margin-bottom: 20px; text-transform: uppercase; font-weight: 700;">Projetos Recentes</h2>
+            <div class="gallery-grid">
+                <div class="mini-window nks-window animate-in delay-3">
+                    <div class="mini-header">Showreel 2025</div>
+                    <div class="mini-body"><i data-lucide="play-circle" color="#E63946" size="40"></i></div>
+                </div>
+                <div class="mini-window nks-window animate-in delay-3">
+                    <div class="mini-header">Timeline_Project_01</div>
+                    <div class="mini-body"><div class="ui-bar" style="background:#E63946; width: 90%;"></div><div class="ui-bar" style="width:60%"></div></div>
+                </div>
+                <div class="mini-window nks-window animate-in delay-3">
+                    <div class="mini-header">Equipamento</div>
+                    <div class="mini-body"><i data-lucide="camera" color="#fff" size="30"></i></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="footer-credits">© 2025 Matheus Zamperlini. Visual Arts & Filmmaking.</div>
+
+    <footer class="taskbar">
+        <div class="start-btn" title="Iniciar MZ">
+            <div class="start-logo">
+                <div class="win-sq"></div><div class="win-sq"></div><div class="win-sq"></div><div class="win-sq"></div>
+            </div>
+        </div>
+        <div class="taskbar-apps">
+            <div class="task-item active"><i data-lucide="film" size="18" color="#E63946"></i> <span>Adobe Premiere</span></div>
+            <div class="task-item"><i data-lucide="camera" size="18"></i> <span>REC</span></div>
+        </div>
+        <div class="tray-area" id="clock">12:00 PM</div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+        
+        // Relógio
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerHTML = `<span style="font-weight:600; color: #E63946;">${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>`;
+        }, 1000);
+    </script>
+
+    <!-- MODULE SCRIPT PARA THREE.JS + GLTFLoader -->
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+        import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/loaders/GLTFLoader.js';
+
+        // --- SETUP CENA ---
+        const canvas = document.querySelector('#bg-canvas');
+        const scene = new THREE.Scene();
+        // A neblina continua no fundo, mas vamos ignorar no material da raposa
+        scene.fog = new THREE.FogExp2(0x050101, 0.04); 
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 40, 150); 
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        
+        // CORREÇÃO 1: Mudar ToneMapping para Linear (menos contraste escuro) e aumentar exposição
+        renderer.toneMapping = THREE.LinearToneMapping; 
+        renderer.toneMappingExposure = 1.5;
+
+        // --- LUZES ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+
+        // Luz super forte
+        const dirLight = new THREE.DirectionalLight(0xffffff, 4.0); 
+        dirLight.position.set(10, 50, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const rimLight = new THREE.PointLight(0xffffff, 2.0, 100);
+        rimLight.position.set(-20, 20, -20);
+        scene.add(rimLight);
+
+        // --- CARREGAR MODELO FOX ---
+        let mixer;
+        let foxModel;
+        let actions = {};
+        let activeAction;
+        let lastAction;
+
+        const loader = new GLTFLoader();
+        const foxUrl = 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb';
+
+        loader.load(foxUrl, (gltf) => {
+            foxModel = gltf.scene;
+            
+            foxModel.scale.set(0.6, 0.6, 0.6); 
+            foxModel.position.set(0, -25, 0);
+            
+            // --- MATERIAL OVERRIDE (CORREÇÃO DE COR) ---
+            const nksWhiteMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFFFFF,       
+                emissive: 0x444444,    // Auto-iluminação moderada
+                roughness: 0.2,        
+                metalness: 0.1,        
+                flatShading: false,
+                fog: false             // CORREÇÃO CRÍTICA: Ignora a neblina preta
+            });
+
+            foxModel.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    child.material = nksWhiteMaterial;
+                    if (child.material.map) child.material.map = null; 
+                }
+            });
+
+            scene.add(foxModel);
+
+            // --- ANIMAÇÕES ---
+            mixer = new THREE.AnimationMixer(foxModel);
+            const animations = gltf.animations;
+            actions['Survey'] = mixer.clipAction(animations[0]);
+            actions['Walk'] = mixer.clipAction(animations[1]);
+            actions['Run'] = mixer.clipAction(animations[2]);
+
+            activeAction = actions['Survey'];
+            activeAction.play();
+
+            document.getElementById('loading-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.display = 'none';
+            }, 500);
+
+        }, undefined, (error) => {
+            console.error(error);
+        });
+
+        // --- INTERAÇÃO E LÓGICA ---
+        let mouseX = 0;
+        let mouseY = 0;
+        let lastScrollY = window.scrollY;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        function switchAction(name) {
+            const newAction = actions[name];
+            if (activeAction !== newAction) {
+                lastAction = activeAction;
+                activeAction = newAction;
+                lastAction.fadeOut(0.5);
+                activeAction.reset().fadeIn(0.5).play();
+            }
+        }
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+
+            const currentScrollY = window.scrollY;
+            const scrollDelta = Math.abs(currentScrollY - lastScrollY);
+            
+            if (scrollDelta > 0.5) {
+                switchAction('Run');
+                camera.position.y += (Math.random() - 0.5) * 0.1;
+            } else {
+                if (activeAction !== actions['Survey']) {
+                     switchAction('Survey'); 
+                }
+            }
+            
+            if (foxModel) {
+                const maxScroll = document.body.scrollHeight - window.innerHeight;
+                const scrollFraction = currentScrollY / maxScroll;
+                foxModel.rotation.y = (scrollFraction * Math.PI * 2) + (mouseX * 0.5);
+                foxModel.position.z = Math.sin(scrollFraction * Math.PI) * 40;
+                foxModel.rotation.x = mouseY * 0.1;
+            }
+
+            lastScrollY = currentScrollY;
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
